@@ -29,10 +29,12 @@ lazy_static! {
     static ref INTERNAL_EVENT: RwLock<Option<InternalEvent>> = RwLock::new(None);
 }
 
+#[derive(Debug)]
 enum InternalEvent {
     RedrawRequested,
 }
 
+#[derive(Debug)]
 enum EventSource {
     Callback,
     InputQueue,
@@ -41,6 +43,7 @@ enum EventSource {
 }
 
 fn poll(poll: Poll) -> Option<EventSource> {
+    ndk_glue::android_log_debug("rust_demo", &format!("event_looper poll = {:?}", poll));
     match poll {
         Poll::Event { ident, .. } => match ident {
             ndk_glue::NDK_GLUE_LOOPER_EVENT_PIPE_IDENT => Some(EventSource::Callback),
@@ -55,7 +58,7 @@ fn poll(poll: Poll) -> Option<EventSource> {
                 .take()
                 .map_or(EventSource::User, EventSource::Internal),
         ),
-        Poll::Callback => unreachable!(),
+        Poll::Callback => None, // Some(EventSource::Callback), // unreachable!(),
     }
 }
 
@@ -121,7 +124,10 @@ impl<T: 'static> EventLoop<T> {
             let mut redraw = false;
             let mut resized = false;
 
-            match self.first_event.take() {
+            let first = self.first_event.take();
+            ndk_glue::android_log_debug("rust_demo", &format!("efirst_event.take() = {:?}", first));
+
+            match first {
                 Some(EventSource::Callback) => match ndk_glue::poll_events().unwrap() {
                     Event::WindowCreated => {
                         call_event_handler!(
